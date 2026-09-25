@@ -21,7 +21,7 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: process.env.BASE_URL || "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
@@ -60,6 +60,12 @@ export default defineConfig({
     },
     // ── Landing tests ─────────────────────────────────────────────────────────
     // No addInitScript — landing page doesn't need special localStorage state.
+    // ── Vẹt Vàng companion journeys (viewports set per test) ────────────────
+    {
+      name: "chromium-companion",
+      testMatch: /companion\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], channel: "chromium" },
+    },
     {
       name: "chromium",
       testMatch: /landing\.spec\.ts/,

@@ -8,9 +8,11 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { addXP } from "@/lib/gamification";
-import { getCachedUserId, saveBudgetPots, addExpense, saveIncome as saveIncomeRemote } from "@/lib/supabase/user-data";
+import { getCachedUserId, saveBudgetPots, saveIncome as saveIncomeRemote } from "@/lib/supabase/user-data";
 import type { BudgetPot, Expense } from "@/lib/types/budget";
-import { getBudgetPots, setBudgetPots, getExpenses, setExpenses as setExpensesLocal, getIncome, setIncome as setIncomeLocal, getLedgerEntries, setLedgerEntries } from "@/lib/storage";
+import { getBudgetPots, setBudgetPots, getExpenses, setExpenses as setExpensesLocal, getIncome, setIncome as setIncomeLocal } from "@/lib/storage";
+import { commitTransactions, onFinanceChanged } from "@/lib/stores/transaction-store";
+import { newId, toLocalDateKey } from "@/lib/companion/transaction-parser";
 import { cn, formatNumber, parseNumber } from "@/lib/utils";
 
 /* ─── Local alias — budget page uses "Pot" internally ─── */
@@ -156,7 +158,7 @@ function LogExpenseModal({ pot, onClose, onLog }: { pot: Pot; onClose: () => voi
   const handleSubmit = () => {
     if (!amountDisplay) return;
     onLog({
-      id: Date.now().toString(),
+      id: newId(),
       potId: pot.id,
       amount: parseNumber(amountDisplay),
       note: note.trim() || "Chi tiêu",
@@ -233,76 +235,71 @@ export default function BudgetPage() {
   const [editIncome, setEditIncome] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setPots(getBudgetPots());
-      setExpenses(getExpenses());
-      const loadedIncome = getIncome();
-      setIncome(loadedIncome);
-      if (loadedIncome <= 0) {
-        setEditIncome(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
+  const reload = useCallback(() => {
+    setPots(getBudgetPots());
+    setExpenses(getExpenses());
+    setIncome(getIncome());
   }, []);
 
-  const save = useCallback((p: Pot[], e: Expense[], i: number) => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      reload();
+      if (getIncome() <= 0) setEditIncome(true);
+    }, 0);
+    // Vẹt Vàng and the ledger write through the transaction store; refresh when they do.
+    const unsubscribe = onFinanceChanged(reload);
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [reload]);
+
+  // Pots and income are budget settings; transactions only go through the transaction store,
+  // so a stale `expenses` array here can never overwrite what another view just saved.
+  const savePots = useCallback((p: Pot[]) => {
     setBudgetPots(p);
-    setExpensesLocal(e);
-    setIncomeLocal(i);
-    if (getCachedUserId()) {
-      saveBudgetPots(p).catch(() => { });
-      saveIncomeRemote(i).catch(() => { });
-    }
+    if (getCachedUserId()) saveBudgetPots(p).catch(() => { });
   }, []);
 
   const addPot = (pot: Pot) => {
     const newPots = [...pots, pot];
     setPots(newPots);
-    save(newPots, expenses, income);
+    savePots(newPots);
     addXP("setup_budget");
   };
 
   const removePot = (id: string) => {
     const newPots = pots.filter((p) => p.id !== id);
-    const newExpenses = expenses.filter((e) => getExpensePotId(e) !== id);
     setPots(newPots);
-    setExpenses(newExpenses);
-    save(newPots, newExpenses, income);
+    savePots(newPots);
+    // Keep the money history: the pot's transactions become unassigned instead of deleted.
+    setExpensesLocal(getExpenses().map((e) => (getExpensePotId(e) === id ? { ...e, potId: "", pot_id: null } : e)));
+    setExpenses(getExpenses());
   };
 
   const logExpense = (expense: Expense) => {
-    const newExpenses = [...expenses, expense];
-    setExpenses(newExpenses);
-    save(pots, newExpenses, income);
-    addXP("log_expense");
-
     const pot = pots.find(p => p.id === getExpensePotId(expense));
-    const ledgerEntry = {
-      id: expense.id,
-      amount: expense.amount,
-      type: "expense" as const,
-      category: pot?.name || "Khác",
-      note: expense.note || "",
-      date: new Date(expense.date).toISOString().slice(0, 10),
-      createdAt: new Date().toISOString(),
-    };
-    setLedgerEntries([...getLedgerEntries(), ledgerEntry]);
-
-    if (getCachedUserId()) {
-      addExpense({
+    try {
+      commitTransactions([{
+        id: expense.id,
+        type: "expense",
         amount: expense.amount,
         category: pot?.name || "Khác",
-        note: expense.note,
-        date: new Date().toISOString(),
-        pot_id: getExpensePotId(expense) || null,
-      }).catch(() => { });
+        note: expense.note || "",
+        date: toLocalDateKey(new Date(expense.date)),
+        potId: getExpensePotId(expense) || null,
+      }]);
+      addXP("log_expense");
+    } catch (err) {
+      window.alert(`Chưa lưu được khoản chi: ${err instanceof Error ? err.message : "lỗi không xác định"}`);
     }
+    reload();
   };
 
   const updateIncome = (val: number) => {
     setIncome(val);
-    save(pots, expenses, val);
+    setIncomeLocal(val);
+    if (getCachedUserId()) saveIncomeRemote(val).catch(() => { });
     setEditIncome(false);
   };
 
@@ -318,9 +315,12 @@ export default function BudgetPage() {
     a.click(); URL.revokeObjectURL(url);
   };
 
-  const getSpent = (potId: string) => expenses.filter((e) => getExpensePotId(e) === potId).reduce((s, e) => s + e.amount, 0);
+  // Budgets are monthly: only this month's spending counts against pots and income.
+  const thisMonth = toLocalDateKey(new Date()).slice(0, 7);
+  const monthExpenses = expenses.filter((e) => toLocalDateKey(new Date(e.date)).slice(0, 7) === thisMonth);
+  const getSpent = (potId: string) => monthExpenses.filter((e) => getExpensePotId(e) === potId).reduce((s, e) => s + e.amount, 0);
   const totalAllocated = pots.reduce((s, p) => s + p.allocated, 0);
-  const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
   const remaining = income - totalSpent;
   const allocationRate = income > 0 ? Math.round((totalAllocated / income) * 100) : 0;
 

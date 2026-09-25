@@ -48,11 +48,14 @@ CRON_SECRET=
 2. **Generative AI Usage:** Use `gemini-batch.ts` for bulk AI processing (e.g., Morning Briefs, News summaries) to save costs and avoid timeouts. Reserve the interactive streaming `api/chat` strictly for user conversations.
 3. **Mascot Persona (CRITICAL VIRAL FEATURE):** Vẹt Vàng (Golden Parrot) MUST BE the most sarcastic, street-smart, and brutally honest financial advisor in Vietnam. Do not write polite, generic AI responses. The chat is the core viral loop to build user habits.
 
-### AI Chat Pipeline (3-tier fallback — always check tiers in order)
+### Vẹt Vàng Companion (see `docs/ARCHITECTURE.md`)
 
-1. **Regex expense parser** (`src/lib/expense-parser.ts`) — parses `"phở 30k"` → `{item, amount, category}` with 0 API calls. Check this first when adding expense-parsing logic.
-2. **Scripted responses** (`src/lib/scripted-responses.ts`) — 500+ canned responses across 25 intents. Each entry has `ttsText` (emoji-free, for TTS). Add new responses here before reaching Gemini.
-3. **Gemini streaming** (`src/lib/gemini.ts` + `POST /api/chat`) — Edge Runtime, 3-attempt retry, `callGemini` and `callGeminiJSON` variants. Only hits this tier when tiers 1-2 don't match.
+1. **Tier 1 — deterministic** (`src/lib/companion/intent.ts`, `amount.ts`, `transaction-parser.ts`) — logging ("phở 35k, cà phê 25k"), today/month/budget questions, edit/undo. 0 API calls, works offline.
+2. **Tier 2 — LLM intent extraction** (`POST /api/companion/interpret`) — only for sentences tier 1 can't place. Receives the sentence only (no balances/history), output validated with zod.
+3. **Engine** (`src/lib/companion/finance-snapshot.ts`) — every number in a reply comes from here, never from the LLM.
+4. **Writes** go ONLY through `src/lib/stores/transaction-store.ts` (idempotent by id, verified after write, broadcasts `vietfi:finance-changed`). Any data change from chat is a proposal the user confirms.
+
+`POST /api/chat`, `scripted-responses.ts` and `expense-parser.ts` are legacy (the chat route was removed in `34f06ee`).
 
 ### News System
 
@@ -77,7 +80,7 @@ CRON_SECRET=
 
 ### API Routes
 
-- **`POST /api/chat`** — Edge Runtime. Custom Data Stream Protocol for Gemini streaming. Requires `GEMINI_API_KEY`.
+- **`POST /api/companion/interpret`** — Node.js Runtime. Tier-2 intent extraction for Vẹt Vàng (message only, zod-validated, 8s timeout, 20 req/min/IP).
 - **`POST /api/tts`** — Node.js Runtime. Edge TTS (Microsoft, free Vietnamese voice `vi-VN-HoaiMyNeural`). Returns audio blob.
 - **`GET /api/market-data`** — Node.js Runtime. Returns live `MarketSnapshot`: VN-Index (cafef), Gold SJC (Yahoo Finance USD/oz → VND/tael), USD/VND (SBV homepage with open.er-api.com fallback). Auto-refreshes every 5 minutes.
 - **`POST /api/cron/market-data`** — Node.js Runtime. CRON_SECRET Bearer auth. Same data as `/api/market-data` for Vercel cron scheduling.

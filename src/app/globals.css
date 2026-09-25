@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #ffd700;
-  --color-primary-hover: #ffc107;
-  --color-accent: #00e5ff;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
-  --color-bg: #0a0a0f;
-  --color-bg-card: #12121a;
-  --color-bg-card-hover: #1a1a25;
-  --color-border: #2a2a3a;
-  --color-text: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-gradient-start: #ffd700;
-  --color-gradient-end: #ff6b35;
+  --color-primary: #f59e0b;
+  --color-primary-hover: #d97706;
+  --color-accent: #0284c7;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-warning: #ea580c;
+  --color-bg: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-gradient-start: #f59e0b;
+  --color-gradient-end: #ea580c;
 
   /* Font Tokens */
   --font-heading: var(--font-noto-sans), sans-serif;
@@ -33,7 +33,12 @@
 
   html {
     scroll-behavior: smooth;
-    color-scheme: dark;
+    color-scheme: light;
+    scrollbar-gutter: stable;
+  }
+
+  h1, h2, h3, h4, h5, h6, p {
+    text-wrap: pretty;
   }
 
   body {
@@ -49,11 +54,12 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scrollbar-gutter: stable;
   }
 
   ::selection {
-    background-color: rgba(255, 215, 0, 0.3);
-    color: #fff;
+    background-color: rgba(245, 158, 11, 0.25);
+    color: #0f172a;
   }
 }
 
@@ -77,16 +83,13 @@
     );
   }
 
+  /* Solid Clean Card (NO GLASSMORPHISM) */
   .glass-card {
-    background: rgba(18, 18, 26, 0.8);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 16px;
-    color: rgba(240, 240, 245, 0.92);
-  }
-
-  .glass-card {
-    color: rgba(240, 240, 245, 0.92);
+    color: #0f172a;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
   }
 
   .glass-card p,
@@ -101,14 +104,14 @@
   .glass-card button,
   .glass-card label,
   .glass-card li {
-    color: rgba(240, 240, 245, 0.92) !important;
+    color: #0f172a;
   }
 
   .glass-card-hover:hover {
-    background: rgba(26, 26, 37, 0.9);
-    border-color: rgba(255, 215, 0, 0.15);
+    background: #f8fafc;
+    border-color: #cbd5e1;
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   }
 
   .glow-primary {

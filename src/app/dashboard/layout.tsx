@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 import { CyberBackground } from "@/components/ui/CyberBackground";
+import CompanionLauncher from "@/components/companion/CompanionLauncher";
 import {
   TrendingUp,
   LayoutDashboard,
@@ -54,58 +55,26 @@ import {
   clearAllUserData,
 } from "@/lib/storage";
 
-/* ─── Navigation Groups ─── */
+/* ─── Navigation Groups (Finhackathon Streamlined) ─── */
 const navGroups = [
   {
-    label: "TỔNG QUAN",
+    label: "TRỌNG TÂM QUYẾT ĐỊNH",
     items: [
       { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
-      { href: "/dashboard/leaderboard", label: "Bảng xếp hạng", icon: Trophy },
+      { href: "/dashboard/simulator", label: "Mô phỏng Quyết định", icon: Sparkles },
+      { href: "/dashboard/debt", label: "Quỹ nợ & DTI", icon: CreditCard },
+      { href: "/dashboard/cashflow", label: "Dòng tiền & Ngân sách", icon: Wallet },
+      { href: "/dashboard/portfolio", label: "Cố vấn danh mục", icon: PieChart },
     ],
   },
   {
-    label: "QUẢN LÝ TÀI CHÍNH",
+    label: "KHÁM PHÁ THÊM",
     items: [
-      { href: "/dashboard/cashflow", label: "Dòng tiền", icon: Wallet },
-      { href: "/dashboard/debt", label: "Quỹ nợ", icon: CreditCard },
-      {
-        href: "/dashboard/spending-insights",
-        label: "Phân tích chi tiêu",
-        icon: Calculator,
-      },
-    ],
-  },
-  {
-    label: "THỊ TRƯỜNG",
-    items: [
-      {
-        href: "/dashboard/market-overview",
-        label: "Tổng quan thị trường",
-        icon: Activity,
-      },
+      { href: "/dashboard/market-overview", label: "Thị trường đa lớp", icon: Activity },
+      { href: "/dashboard/learn", label: "Bài học Vẹt", icon: BookOpen },
+      { href: "/dashboard/housing", label: "Kế hoạch nhà ở", icon: Home },
       { href: "/dashboard/news", label: "Tin tức AI", icon: Newspaper },
-      { href: "/dashboard/backtest", label: "Backtest Pro", icon: LineChart },
-    ],
-  },
-  {
-    label: "KẾ HOẠCH LỚN",
-    items: [{ href: "/dashboard/housing", label: "Nhà ở", icon: Home }],
-  },
-  {
-    label: "CỐ VẤN AI",
-    items: [
-      {
-        href: "/dashboard/risk-profile",
-        label: "Tính cách đầu tư",
-        icon: UserCircle,
-      },
-      {
-        href: "/dashboard/portfolio",
-        label: "Cố vấn danh mục",
-        icon: PieChart,
-      },
-      { href: "/dashboard/gurus", label: "Cố vấn Lão làng", icon: Sparkles },
-      { href: "/dashboard/learn", label: "Bài Học Vẹt", icon: BookOpen },
+      { href: "/dashboard/leaderboard", label: "Bảng xếp hạng", icon: Trophy },
     ],
   },
 ];
@@ -136,18 +105,20 @@ function GamificationBar() {
 
     const t = setInterval(() => {
       const newGam = getGamification();
-      if (newGam.xp > prevXPRef.current) {
-        setXpFlash(true);
-        setTimeout(() => setXpFlash(false), 600);
+      if (newGam.xp !== prevXPRef.current) {
+        if (newGam.xp > prevXPRef.current) {
+          setXpFlash(true);
+          setTimeout(() => setXpFlash(false), 600);
+        }
         prevXPRef.current = newGam.xp;
+        setGam(newGam);
       }
-      setGam(newGam);
-    }, 1000);
+    }, 2000);
     return () => {
       window.clearTimeout(timer);
       clearInterval(t);
     };
-  }, [getGamification]); // Polling from the local storage helper function
+  }, [getGamification]);
 
   const { current, next, progress, xpToNext } = getLevelProgress(gam.xp);
 
@@ -158,85 +129,58 @@ function GamificationBar() {
         className={cn(
           "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all",
           gam.streak >= 3
-            ? "bg-[#FF6B35]/10 border-[#FF6B35]/20"
-            : "bg-white/[0.03] border-white/[0.06]",
+            ? "bg-amber-100 border-amber-300 text-amber-900"
+            : "bg-slate-100 border-slate-200 text-slate-700",
         )}
-        animate={
-          gam.streak >= 3
-            ? {
-              boxShadow: [
-                "0 0 0px rgba(255,107,53,0)",
-                "0 0 12px rgba(255,107,53,0.3)",
-                "0 0 0px rgba(255,107,53,0)",
-              ],
-            }
-            : {}
-        }
-        transition={{ repeat: Infinity, duration: 2 }}>
-        <Flame
-          className={cn(
-            "w-4 h-4",
-            gam.streak >= 3 ? "text-[#FF6B35]" : "text-white/50",
-          )}
-        />
+      >
+        <span className="text-sm">🔥</span>
         <span
           className={cn(
-            "text-xs font-black font-mono",
-            gam.streak >= 3 ? "text-[#FF6B35]" : "text-white/90",
-          )}>
-          {gam.streak || 0}
+            "text-xs font-bold font-mono",
+            gam.streak >= 3 ? "text-amber-900 font-black" : "text-slate-700",
+          )}
+        >
+          {gam.streak} ngày
         </span>
       </motion.div>
 
-      {/* Level badge — click to open Weekly Report */}
-      <button
-        onClick={() => setShowReport(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.1] hover:border-[#E6B84F]/30 hover:bg-[#E6B84F]/10 transition-all cursor-pointer group">
-        <span className="text-base group-hover:scale-110 transition-transform">
-          {current.emoji}
-        </span>
-        <span className="text-xs text-white/90 font-bold uppercase tracking-widest">
-          {current.name.split(" ").slice(1).join(" ")}
-        </span>
-      </button>
-      <WeeklyReportModal
-        isOpen={showReport}
-        onClose={() => setShowReport(false)}
-      />
-
-      {/* XP counter + progress */}
+      {/* Level + XP Progress Bar */}
       <motion.div
         className={cn(
-          "flex items-center gap-3 px-4 py-1.5 rounded-lg border transition-all",
+          "flex items-center gap-2 px-3 py-1 rounded-xl border transition-all",
           xpFlash
-            ? "bg-[#E6B84F]/10 border-[#E6B84F]/40"
-            : "bg-white/[0.03] border-white/[0.1]",
+            ? "bg-amber-100 border-amber-400"
+            : "bg-slate-50 border-slate-200",
         )}
-        animate={xpFlash ? { scale: [1, 1.05, 1] } : {}}
-        transition={{ duration: 0.3 }}>
+      >
+        <span className="text-base">{current.emoji}</span>
+        <span className="text-xs font-bold text-slate-800 hidden sm:inline">
+          {current.name}
+        </span>
         <Zap
           className={cn(
-            "w-4 h-4",
-            xpFlash ? "text-[#E6B84F]" : "text-white/90",
+            "w-3.5 h-3.5",
+            xpFlash ? "text-amber-600" : "text-amber-500",
           )}
         />
         <span
           className={cn(
-            "text-sm font-black font-mono tabular-nums",
-            xpFlash ? "text-[#E6B84F]" : "text-white/70",
-          )}>
-          {gam.xp}
+            "text-xs font-black font-mono tabular-nums",
+            xpFlash ? "text-amber-700" : "text-slate-800",
+          )}
+        >
+          {gam.xp} XP
         </span>
-        <div className="w-24 h-2.5 bg-white/[0.08] rounded-full overflow-hidden">
+        <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
           <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-[#E6B84F] to-[#FFD700]"
+            className="h-full rounded-full bg-amber-500"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           />
         </div>
         {next && (
-          <span className="text-[10px] text-white/90 font-black font-mono whitespace-nowrap tracking-tighter">
+          <span className="text-[10px] text-slate-500 font-bold font-mono whitespace-nowrap">
             {xpToNext}→{next.emoji}
           </span>
         )}
@@ -397,27 +341,27 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full w-[260px] bg-[#0A0B0F]/95 backdrop-blur-xl border-r border-white/[0.06] z-50 transition-transform duration-300 flex flex-col",
+          "fixed top-0 left-0 h-full w-[260px] bg-white border-r border-slate-200 z-50 transition-transform duration-300 flex flex-col shadow-xs",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}>
         {/* Logo */}
-        <div className="h-[70px] px-6 flex items-center justify-between border-b border-white/[0.1]">
+        <div className="h-[70px] px-6 flex items-center justify-between border-b border-slate-100">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-[0_0_25px_rgba(255,215,0,0.3)] group-hover:scale-105 transition-transform">
-              <TrendingUp className="w-5.5 h-5.5 text-black" />
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-5.5 h-5.5 text-white" />
             </div>
             <div className="flex flex-col">
               <span className="font-black text-[18px] leading-tight tracking-tight uppercase">
-                <span className="text-gradient">VietFi</span>
-                <span className="text-white/70 font-bold ml-1 text-xs">
-                  Adv
+                <span className="text-slate-900">VietFi</span>
+                <span className="text-amber-600 font-bold ml-1 text-xs">
+                  Advisor
                 </span>
               </span>
             </div>
           </Link>
           <button
             onClick={onClose}
-            className="md:hidden text-white/70 hover:text-white transition-colors">
+            className="md:hidden text-slate-400 hover:text-slate-700 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -426,8 +370,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         <nav className="flex-1 py-4 px-4 overflow-y-auto space-y-6">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 mb-2.5">
-                <span className="text-[12px] font-black tracking-[0.2em] text-white/90 uppercase font-mono">
+              <div className="px-3 mb-2">
+                <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-sans">
                   {group.label}
                 </span>
               </div>
@@ -440,20 +384,20 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-all duration-300 group",
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group",
                         active
-                          ? "bg-[#E6B84F]/10 text-[#E6B84F] font-bold shadow-[inset_0_0_20px_rgba(230,184,79,0.05)]"
-                          : "text-white/80 hover:text-white hover:bg-white/[0.04]",
+                          ? "bg-amber-50 text-amber-900 font-bold border border-amber-200/60 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70",
                       )}>
                       <item.icon
                         className={cn(
-                          "w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110",
-                          active ? "text-[#E6B84F]" : "text-white/90",
+                          "w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-105",
+                          active ? "text-amber-600" : "text-slate-400 group-hover:text-slate-700",
                         )}
                       />
-                      <span className="flex-1 font-semibold">{item.label}</span>
+                      <span className="flex-1 font-medium">{item.label}</span>
                       {active && (
-                        <ChevronRight className="w-4 h-4 text-[#E6B84F]/50" />
+                        <ChevronRight className="w-4 h-4 text-amber-500" />
                       )}
                     </Link>
                   );
@@ -463,29 +407,27 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           ))}
 
           {/* Logout Button */}
-          <div className="pt-4 border-t border-white/[0.04]">
+          <div className="pt-4 border-t border-slate-100">
             <button
               onClick={() => {
                 setShowLogoutConfirm(true);
               }}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] transition-all duration-300 group text-danger/60 hover:text-danger hover:bg-danger/10 text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group text-rose-600 hover:bg-rose-50 text-left font-medium"
             >
-              <LogOut className="w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 text-danger/40 group-hover:text-danger" />
-              <span className="flex-1 font-semibold">Đăng xuất</span>
+              <LogOut className="w-4 h-4 flex-shrink-0 text-rose-400 group-hover:text-rose-600" />
+              <span className="flex-1">Đăng xuất</span>
             </button>
           </div>
         </nav>
 
-
-
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/[0.04]">
+        <div className="px-5 py-3 border-t border-slate-100">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-white/50 font-mono">
+            <span className="text-[10px] text-slate-400 font-mono">
               VietFi v1.0
             </span>
-            <span className="text-[10px] text-white/50 font-mono">
-              WDA 2026
+            <span className="text-[10px] text-amber-600 font-bold font-mono">
+              FinHackathon 2026
             </span>
           </div>
         </div>
@@ -502,50 +444,41 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Trigger one-time localStorage → Supabase migration if logged in
-  useEffect(() => {
-    getAuthUserId().then((userId) => {
-      if (userId) {
-        migrateLocalStorageToSupabase(userId);
-      }
-    });
-  }, []);
-
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-[#F8FAFC]">
       <CyberBackground />
 
       <div className="relative z-10 min-h-screen">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Top bar (mobile) */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[#0A0B0F]/90 backdrop-blur-xl border-b border-white/[0.06] z-30 flex items-center px-4 gap-3">
+        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 border-b border-slate-200 z-30 flex items-center px-4 gap-3 shadow-xs">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center">
-            <Menu className="w-4 h-4 text-white/90" />
+            className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+            <Menu className="w-4 h-4" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-primary flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5 text-black" />
+            <div className="w-6 h-6 rounded-md bg-amber-500 flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-sm text-gradient">VietFi</span>
+            <span className="font-bold text-sm text-slate-900">VietFi</span>
           </div>
         </div>
 
         {/* Desktop Top Bar — XP + Streak */}
-        <div className="hidden md:flex fixed top-0 left-[260px] right-0 h-12 bg-[#0A0B0F]/80 backdrop-blur-xl border-b border-white/[0.04] z-30 items-center px-6 justify-end gap-4">
+        <div className="hidden md:flex fixed top-0 left-[260px] right-0 h-12 bg-white/90 border-b border-slate-200 z-30 items-center px-6 justify-end gap-4 shadow-xs">
           <GamificationBar />
         </div>
 
         {/* Main content */}
-        <main className="md:ml-[260px] min-h-screen pt-14 md:pt-12 relative overflow-hidden">
+        <main className="md:ml-[260px] min-h-screen pt-14 md:pt-12 relative overflow-hidden bg-[#F8FAFC]">
           <div className="relative z-10 p-4 md:p-6 lg:p-8 w-full">
             {children}
           </div>
         </main>
 
-
+        <CompanionLauncher />
       </div>
     </div>
   );

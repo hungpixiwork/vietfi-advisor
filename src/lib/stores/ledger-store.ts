@@ -1,6 +1,8 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getLedgerEntries, setLedgerEntries, LedgerEntry } from "@/lib/storage";
+import { useState, useEffect, useCallback } from "react";
+import { getLedgerEntries, LedgerEntry } from "@/lib/storage";
+import { commitTransactions, deleteTransaction as removeFromStore, onFinanceChanged } from "@/lib/stores/transaction-store";
+import { newId } from "@/lib/companion/transaction-parser";
 
 export type Period = "today" | "month";
 
@@ -43,11 +45,9 @@ export function parseVNDInput(text: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
 /* ─── Custom hook store (no zustand) ─── */
+// Reads the ledger from storage; every write goes through the transaction store
+// so the budget page, Vẹt Vàng and this view never overwrite each other.
 
 export function useLedgerStore() {
   const [state, setState] = useState<LedgerState>({
@@ -61,36 +61,7 @@ export function useLedgerStore() {
     undoQueue: [],
   });
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const entries = getLedgerEntries();
-        setState((prev) => ({
-          ...prev,
-          transactions: entries,
-          ui: { ...prev.ui, loading: false },
-        }));
-      } catch {
-        setState((prev) => ({
-          ...prev,
-          ui: { ...prev.ui, loading: false, error: "Kh?ng t?i ???c d? li?u" },
-        }));
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  // Persist to localStorage whenever transactions change
-  const persist = useCallback((transactions: LedgerEntry[]) => {
-    setLedgerEntries(transactions);
-  }, []);
-
-  /* ─── Actions ─── */
-
   const loadFromStorage = useCallback(() => {
-    setState((prev) => ({ ...prev, ui: { ...prev.ui, loading: true } }));
     try {
       const entries = getLedgerEntries();
       setState((prev) => ({
@@ -106,70 +77,71 @@ export function useLedgerStore() {
     }
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(loadFromStorage, 0);
+    const unsubscribe = onFinanceChanged(loadFromStorage);
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [loadFromStorage]);
+
+  const fail = useCallback((err: unknown) => {
+    const message = err instanceof Error ? err.message : "Không lưu được";
+    setState((prev) => ({ ...prev, ui: { ...prev.ui, error: message } }));
+  }, []);
+
+  /* ─── Actions ─── */
+
   const addTransaction = useCallback(
     (data: Omit<LedgerEntry, "id" | "createdAt">) => {
-      const entry: LedgerEntry = {
-        ...data,
-        id: generateId(),
-        createdAt: new Date().toISOString(),
-      };
-
-      setState((prev) => {
-        const next = [...prev.transactions, entry];
-        persist(next);
-        return {
-          ...prev,
-          transactions: next,
-          undoQueue: [
-            ...prev.undoQueue.slice(-9), // keep last 10
-            { action: "add", entry },
-          ],
-        };
-      });
+      try {
+        const { saved } = commitTransactions([{ ...data, id: newId() }]);
+        const entry = getLedgerEntries().find((e) => e.id === saved[0]?.id);
+        loadFromStorage();
+        if (entry) {
+          setState((prev) => ({
+            ...prev,
+            undoQueue: [...prev.undoQueue.slice(-9), { action: "add", entry }],
+          }));
+        }
+      } catch (err) {
+        fail(err);
+      }
     },
-    [persist]
+    [fail, loadFromStorage]
   );
 
   const deleteTransaction = useCallback(
     (id: string) => {
-      setState((prev) => {
-        const removed = prev.transactions.find((t) => t.id === id);
-        if (!removed) return prev;
-        const next = prev.transactions.filter((t) => t.id !== id);
-        persist(next);
-        return {
+      const removed = getLedgerEntries().find((t) => t.id === id);
+      if (!removed) return;
+      try {
+        removeFromStore(id);
+        loadFromStorage();
+        setState((prev) => ({
           ...prev,
-          transactions: next,
-          undoQueue: [
-            ...prev.undoQueue.slice(-9),
-            { action: "delete", entry: removed },
-          ],
-        };
-      });
+          undoQueue: [...prev.undoQueue.slice(-9), { action: "delete", entry: removed }],
+        }));
+      } catch (err) {
+        fail(err);
+      }
     },
-    [persist]
+    [fail, loadFromStorage]
   );
 
   const undoLast = useCallback(() => {
-    setState((prev) => {
-      if (prev.undoQueue.length === 0) return prev;
-      const last = prev.undoQueue[prev.undoQueue.length - 1];
-      let next: LedgerEntry[];
-
-      if (last.action === "add") {
-        next = prev.transactions.filter((t) => t.id !== last.entry.id);
-      } else {
-        next = [...prev.transactions, last.entry];
-      }
-
-      persist(next);
-      return {
-        ...prev,
-        transactions: next,
-        undoQueue: prev.undoQueue.slice(0, -1),
-      };
-    });
-  }, [persist]);
+    const last = state.undoQueue[state.undoQueue.length - 1];
+    if (!last) return;
+    try {
+      if (last.action === "add") removeFromStore(last.entry.id);
+      else commitTransactions([last.entry]);
+      loadFromStorage();
+      setState((prev) => ({ ...prev, undoQueue: prev.undoQueue.slice(0, -1) }));
+    } catch (err) {
+      fail(err);
+    }
+  }, [state.undoQueue, fail, loadFromStorage]);
 
   const setPeriod = useCallback((period: Period) => {
     setState((prev) => ({

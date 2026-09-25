@@ -96,3 +96,13 @@ sync_out.txt
 last_5_commits.txt
 git_log_tmp.txt
 test_tcbs.js
+
+# Cloudflare & Secrets
+.dev.vars
+.wrangler/
+scratch/
+better-auth.sqlite
+
+# Playwright output
+/test-results/
+/playwright-report/

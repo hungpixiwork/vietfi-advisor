@@ -5,6 +5,7 @@ import type { NewsArticle, NewsSentimentLabel } from "@/lib/news/crawler";
 import dynamic from "next/dynamic";
 import { isFirstTimeUser, getOnboardingData } from "@/lib/onboarding-state";
 import { cn } from "@/lib/utils";
+import { FINANCE_CHANGED_EVENT } from "@/lib/stores/transaction-store";
 import { getBudgetPots, getExpenses, getIncome, getRiskResult, getMarketCache, getLedgerEntries } from "@/lib/storage";
 import { BASE_ALLOCATIONS, adjustAllocation, type AllocationItem } from "@/lib/constants/allocations";
 
@@ -858,8 +859,8 @@ export default function DashboardOverview() {
     if (isFirstTimeUser()) setShowSetup(true);
     fetchNews();
 
-    const handleStorage = (event: StorageEvent) => {
-      if (["vietfi_pots", "vietfi_expenses", "vietfi_income"].includes(event.key ?? "")) {
+    const handleStorage = (event?: StorageEvent) => {
+      if (!event || ["vietfi_pots", "vietfi_expenses", "vietfi_income"].includes(event.key ?? "")) {
         // Re-compute net worth from localStorage
         const pots = getBudgetPots();
         const expenses = getExpenses();
@@ -881,7 +882,13 @@ export default function DashboardOverview() {
     };
 
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    // Same-tab writes (Vẹt Vàng, ledger) don't fire "storage"; the transaction store broadcasts them.
+    const onChanged = () => handleStorage();
+    window.addEventListener(FINANCE_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(FINANCE_CHANGED_EVENT, onChanged);
+    };
   }, []);
 
   const liveBrief = aiBrief;

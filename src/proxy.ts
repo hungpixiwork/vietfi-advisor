@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { updateSession } from "@/utils/supabase/middleware";
 
 const redirects: Record<string, { pathname: string; search?: string }> = {
   "/dashboard/budget": { pathname: "/dashboard/cashflow", search: "?tab=budget" },
@@ -9,6 +8,7 @@ const redirects: Record<string, { pathname: string; search?: string }> = {
   "/dashboard/sentiment": { pathname: "/dashboard/market-overview", search: "?tab=tam-ly" },
   "/dashboard/market": { pathname: "/dashboard/market-overview", search: "?tab=tai-san" },
   "/dashboard/macro": { pathname: "/dashboard/market-overview", search: "?tab=vi-mo" },
+  "/login": { pathname: "/auth/login" },
 };
 
 export async function proxy(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return await updateSession(request);
+  return NextResponse.next();
 }
 
 export const config = {
