@@ -17,7 +17,11 @@
 
 Vẹt Vàng — con vẹt vàng thông minh nhất Việt Nam 🦜💛
 
-[🚀 Live Demo](https://vietfi-advisor.vercel.app) · [🐛 Báo lỗi](https://github.com/hungpixi/vietfi-advisor/issues) · [📂 CLAUDE.md](./CLAUDE.md)
+[🚀 Live Demo](https://vietfi-advisor.vercel.app) · [📂 CLAUDE.md](./CLAUDE.md)
+
+<br/>
+
+<img src="docs/vietfi-hero-dashboard.png" alt="VietFi Advisor AI Financial Command Center Dashboard" width="920" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" />
 
 </div>
 
